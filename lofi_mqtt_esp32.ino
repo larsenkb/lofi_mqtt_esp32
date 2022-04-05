@@ -99,7 +99,7 @@ typedef struct {
 #endif
 	
 #if (!defined(FALSE))
-#define FALSE 1
+#define FALSE !TRUE
 #endif
 
 
@@ -123,8 +123,8 @@ typedef enum {
 } speed_t;
 
 // Please input the SSID and password of WiFi
-const char *ssid     = "chewbacca";
-const char *password = "Car voice, une oeuvre...";
+const char *ssid     = "";
+const char *password = "";
 
 // MQTT Broker IP address:
 const char *mqtt_server = "192.168.1.65";
@@ -217,27 +217,12 @@ int nrfAddrRead( uint8_t reg, uint8_t *buf, int len );
 uint8_t nrfReadRxPayloadLen(void);
 
 
-
-
 void IRAM_ATTR nrfIntrHandler(void)
 {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-  // nrf is a critical resource/region; maybe better to move this to task?
-//  nrfRegWrite( NRF_STATUS, 0x70 ); // clear the interrupt
-
   xSemaphoreGiveFromISR( sema_nrf, &xHigherPriorityTaskWoken );
 }
-
-
-#if 0
-void callback(char* topic, byte* message, unsigned int length)
-{
-//  Serial.print("Message arrived on topic: ");
-//  Serial.print(topic);
-//  Serial.print(". Message: ");
-}
-#endif
 
 void nrf24_init(void)
 {
@@ -334,12 +319,6 @@ void setup(void)
 
   setup_wifi();
   client.setServer(mqtt_server, 1883);
-//  client.setCallback(callback);
-
-
-
-
-
 
 
   ArduinoOTA
@@ -370,20 +349,6 @@ void setup(void)
 
   ArduinoOTA.begin();
 
-
-
-
-
-
-
-
-
-
-
-	//pinMode(nrfCSN, OUTPUT);
-  //digitalWrite(nrfCSN, HIGH);
-
- // pinMode(nrfCSN, OUTPUT);
 
   SPI.begin(SCLK_PIN, MISO_PIN, MOSI_PIN, NRFIRQ); // sck, miso, mosi, ss (ss can be any GPIO)
   pinMode(nrfCSN, OUTPUT);
@@ -465,8 +430,6 @@ void connectToMQTT()
     vTaskDelay( 250 / portTICK_PERIOD_MS);
   }
   if (verbose) dbug_puts("MQTT Connected");
-//  client.setCallback( mqttCallback );
-//  client.subscribe( mqtt_topic );
 }
 
 void setup_wifi()
@@ -512,8 +475,6 @@ void connectToWiFi()
   WiFi.macAddress(mac);
   if (verbose) dbug_printf( "mac address %02X.%02X.%02X.%02X.%02X.%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]  );
   WiFi.onEvent( WiFiEvent );
-//  GetTheTime();
-//  printLocalTime();
 }
 
 ////
@@ -585,11 +546,9 @@ void parsePayload( void *pvParameters  )
 	  if (nodeId < 1 || nodeId >= maxNodes) {
 		  dbug_printf("Bad nodeId: %d\n", nodeId);
       goto check;
-      //		  continue;
+      //continue;
 	  }
 
-//    sensorId = (payload[1]>>4) & 0xF;
-//    seq = (payload[1] >> 2) & 0x3;
     sensorId = pl->sensorId;
     seq = pl->seq;
     
@@ -606,7 +565,6 @@ void parsePayload( void *pvParameters  )
     }
 
     // this might be invalid if this is a switch msg; otherwise it is good
-#if 1
     val = pl->hi;
     val <<= 8;
     val += pl->low;
@@ -614,11 +572,6 @@ void parsePayload( void *pvParameters  )
     val1 = pl->hi;
     val1 = (val1<<8) | pl->mid;
     val1 = (val1<<8) | pl->low;
-#else
-    val = payload[1] & 0x03;
-    val <<= 8;
-    val += payload[2];
-#endif
 
 		switch (sensorId) {
 		case SENID_REV:
@@ -642,15 +595,9 @@ void parsePayload( void *pvParameters  )
 		case SENID_SW1:
       strcat(topic, "/sw1");
       strcat(u8x8Topic, "/sw1");
-     // sprintf(topicVal, (payload[1] & 0x02) ? "OPEN" : "SHUT");
-      //dbug_printf(" %s\n", (payload[1] & 0x01) ? "PC" : "");
-
-//      sprintf(topicVal, "{\"state\":\"%s\",\"trig\":\"%s\"}", (payload[1] & 0x02) ? "OPEN" : "SHUT", (payload[1] & 0x01) ? "PC" : "WD");
       sprintf(topicVal, "{\"state\":\"%s\",\"trig\":\"%s\"}", (pl->closed) ? "OPEN" : "SHUT", (pl->trig) ? "PC" : "WD");
-//      sprintf(u8x8TopicVal, "%s %s", (payload[1] & 0x02) ? "OPEN" : "SHUT", (payload[1] & 0x01) ? "PC" : "WD");
       sprintf(u8x8TopicVal, "%s %s", (pl->closed) ? "OPEN" : "SHUT", (pl->trig) ? "PC" : "WD");
 			if (longStr) {
-//        tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  SW1: %s", (payload[1] & 0x02) ? "OPEN" : "SHUT");
 				tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  SW1: %s", (pl->closed) ? "OPEN" : "SHUT");
 			}
 			break;
@@ -687,12 +634,7 @@ void parsePayload( void *pvParameters  )
       if (longStr) {
         tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  ATemp: %4.2f", (((float)(val1*200))/0x100000) - 50.0);
       }
-//        topicIdx += snprintf(&topic[topicIdx], 127-topicIdx, "/atemp");
-//        sprintf(topicVal, "%4.2f", (((float)(val1*200))/0x100000) - 50.0);
-//        if (!mqttStr) {
-//            tbufIdx += snprintf(&tbuf[tbufIdx], 127-tbufIdx, "  Temp: %4.2f",((float)(val1*200)/0x100000) - 50.0);
-//        }
-        break;
+      break;
     case SENID_AHUMD:
       strcat(topic, "/ahumd");
       strcat(u8x8Topic, "/ahumd");
@@ -701,13 +643,7 @@ void parsePayload( void *pvParameters  )
       if (longStr) {
         tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  ATemp: %4.2f", (((float)(val1*100))/0x100000));
       }
-//        topicIdx += snprintf(&topic[topicIdx], 127-topicIdx, "/ahumd");
-//        sprintf(topicVal, "%4.2f", (((float)(val1*100))/0x100000));
-//        if (!mqttStr) {
-//            tbufIdx += snprintf(&tbuf[tbufIdx], 127-tbufIdx, "  Temp: %4.2f",((float)(val1*100)/0x100000));
-//        }
-        break;
-
+      break;
 		default:
 			dbug_printf("Bad SensorId: %d\n", sensorId);
 			goto check;
