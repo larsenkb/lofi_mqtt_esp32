@@ -16,9 +16,12 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#define EN_OLED   0
+#if EN_OLED
 #include <U8x8lib.h>
+#endif
 
-#define DEBUG   0
+#define DEBUG   1
 #if DEBUG
 #define dbug_printf(fmt, ...) printf(fmt, __VA_ARGS__)
 #define dbug_puts(str) puts(str)
@@ -123,15 +126,18 @@ typedef enum {
 } speed_t;
 
 // Please input the SSID and password of WiFi
-const char *ssid     = "";
-const char *password = "";
+const char *ssid     = "chewbacca";
+const char *password = "Car voice, une oeuvre...";
 
 // MQTT Broker IP address:
 const char *mqtt_server = "192.168.1.65";
 
 #define SCL   22
 #define SDA   21
+
+#if EN_OLED
 U8X8_SSD1306_128X32_UNIVISION_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE, /* clock=*/ SCL, /* data=*/ SDA);   // pin remapping with ESP8266 HW I2C
+#endif
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -311,11 +317,13 @@ void setup(void)
   sema_nrf = xSemaphoreCreateBinary();
   sema_MQTT_KeepAlive = xSemaphoreCreateBinary();
 
+#if EN_OLED
   u8x8.begin();
   u8x8.setPowerSave(0);
   u8x8.setFont(u8x8_font_chroma48medium8_r);
   u8x8.clear();
   u8x8.refreshDisplay();    // only required for SSD1606/7  
+#endif
 
   setup_wifi();
   client.setServer(mqtt_server, 1883);
@@ -505,7 +513,7 @@ void parsePayload( void *pvParameters  )
   (void) pvParameters;
   int i;
 	unsigned short val;
-  long val1;
+  uint32_t val1;
 	uint8_t	sensorId;
 	uint8_t nodeId;
 	char tbuf[TBUF_LEN+1];
@@ -570,17 +578,17 @@ void parsePayload( void *pvParameters  )
     val += pl->low;
 
     val1 = pl->hi;
-    val1 = (val1<<8) | pl->mid;
-    val1 = (val1<<8) | pl->low;
+    val1 = (val1<<8) | (pl->mid & 0xff);
+    val1 = (val1<<8) | (pl->low & 0xff);
 
 		switch (sensorId) {
 		case SENID_REV:
       strcat(topic, "/rev");
       strcat(u8x8Topic, "/rev");
-      sprintf(topicVal, "%d", val);
-      sprintf(u8x8TopicVal, "%d", val);
+      sprintf(topicVal, "%d.%d", val1/256, val1&0xff);
+      sprintf(u8x8TopicVal, "%d.%d", val1/256, val1&0xff);
 			if (longStr) {
-			 tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  Rev: %4d", val);
+			 tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  Rev: %d.%d", val1/256, val1&0xff);
 			}
 			break;
 		case SENID_CTR:
@@ -627,21 +635,32 @@ void parsePayload( void *pvParameters  )
 			}
 			break;
     case SENID_ATEMP:
+      float ftemp;
       strcat(topic, "/atemp");
       strcat(u8x8Topic, "/atemp");
-      sprintf(topicVal, "%4.2f", (((float)(val1*200))/0x100000) - 50.0);
-      sprintf(u8x8TopicVal, "%4.2f", (((float)(val1*200))/0x100000) - 50.0);
+      ftemp = (((float)(val1 * 200))/0x100000) - 50.0;
+      ftemp = (ftemp * 1.8) + 32.0;
+      if (ftemp < -30.0) ftemp = -30.0;
+      if (ftemp > 140.0) ftemp = 140.0;
+      ftemp += 0.05;
+      sprintf(topicVal, "%4.1f", ftemp);
+      sprintf(u8x8TopicVal, "%4.1f", ftemp);
       if (longStr) {
-        tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  ATemp: %4.2f", (((float)(val1*200))/0x100000) - 50.0);
+        tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  ATemp: %4.1f", ftemp);
       }
       break;
     case SENID_AHUMD:
+      float fhumd;
       strcat(topic, "/ahumd");
       strcat(u8x8Topic, "/ahumd");
-      sprintf(topicVal, "%4.2f", (((float)(val1*100))/0x100000));
-      sprintf(u8x8TopicVal, "%4.2f", (((float)(val1*100))/0x100000));
+      fhumd = ((float)(val1 * 100))/0x100000;
+      fhumd += 0.05;
+      if (fhumd < 0.0) fhumd = 0.0;
+      if (fhumd > 100.0) fhumd = 100.0;
+      sprintf(topicVal, "%4.1f", fhumd);
+      sprintf(u8x8TopicVal, "%4.1f", fhumd);
       if (longStr) {
-        tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  ATemp: %4.2f", (((float)(val1*100))/0x100000));
+        tbufIdx += snprintf(&tbuf[tbufIdx], TBUF_LEN-tbufIdx, "  ATemp: %4.1f", fhumd);
       }
       break;
 		default:
@@ -670,7 +689,7 @@ void parsePayload( void *pvParameters  )
     else
       dbug_puts("");
 
-
+#if EN_OLED
     u8x8.clear();
     if (u8x8Topic[0] == 'w') {
       i = 0;
@@ -684,6 +703,7 @@ void parsePayload( void *pvParameters  )
     u8x8.drawString(0,0,u8x8Topic);
     u8x8.drawString(0,2,u8x8TopicVal);
     u8x8.refreshDisplay();    // only required for SSD1606/7  
+#endif
 
     lastMillis = millis();
     
