@@ -178,26 +178,26 @@ char *nodeMap[] = {
 	"node/11",
 	"node/12",
 	"node/13",
-	"door/Garage",		// node/14
+	"door/Garage",		  // node/14
 	"node/15",
 	"node/16",
-	"door/GarageS",		// node/17
-	"door/Sliding",		// node/18
-	"door/Back",		// node/19
+	"door/GarageS",		  // node/17
+	"door/Sliding",		  // node/18
+	"door/Back",		    // node/19
 	"node/20",
-	"window/OfficeN",	// node/21
+	"window/OfficeN",	  // node/21
 	"window/LivingE",		// node/22
 	"node/23",
-	"window/OfficeS",	// node/24
-	"door/GarageS",	// node/25
-	"window/MasterE",	// node/26
-	"node/27",		// node/27
-	"door/Front",
+	"window/OfficeS",	  // node/24
+	"door/GarageS",	    // node/25
+	"window/MasterE",	  // node/26
+	"node/27",		      // node/27
+	"door/Front",       // node/28
 	"node/29",
 	"node/30",
 	"node/31",
-	"door/Sliding",
-	"node/33",
+	"door/Sliding",     // node/32
+	"door/Office",      // node/33",
 	"node/34",
 	"node/35",
 	"node/36",
