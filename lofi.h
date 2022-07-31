@@ -26,7 +26,10 @@
 
 #define LONG_STR      0
 
-#define DEBUG         0
+#define DEBUG         1
+
+#define EN_TRANSLATE    0
+
 
 #if DEBUG
 #define dbug_printf(fmt, ...) printf(fmt, __VA_ARGS__)
@@ -111,22 +114,14 @@ typedef enum {
 
 
 extern QueueHandle_t nrf_queue;
-//extern SemaphoreHandle_t sema_nrf;
 extern SemaphoreHandle_t sema_MQTT_KeepAlive;
 
-extern const bool printPayload;
 extern char *nodeMap[];
 extern int maxNodes;
-extern const bool longStr;
-extern const bool printSeq;
-extern const speed_t speed;
 extern int mqtt_msg;
 extern int mqtt_pub_err;
 
 extern int mqtt_pub(char *topic, char *topicVal);
-//extern int nrfReadPayload( uint8_t *payload, int len );
-//extern uint8_t nrfRegWrite( int reg, int val);
-//extern uint8_t nrfRegRead( int reg );
 
 //************  Forward Declarations
 //void parsePayload( void *pvParameters );
@@ -141,6 +136,7 @@ extern uint8_t nrfFlushTx( void );
 extern uint8_t nrfFlushRx( void );
 extern int nrfAddrRead( uint8_t reg, uint8_t *buf, int len );
 extern uint8_t nrfReadRxPayloadLen(void);
+extern void nrf24_init(void);
 
 
 

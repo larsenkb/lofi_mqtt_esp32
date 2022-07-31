@@ -1,7 +1,108 @@
+#include <Arduino.h>
+#include <SPI.h>
 
 #include "lofi.h"
 
+volatile uint8_t   gNrfStatus;
+const speed_t speed = speed_250K;
+const int rf_chan = 84;
+const bool en_shockburst = true;
 
+uint8_t spiXfer(uint8_t *buf, int cnt)
+{
+  if (buf == (uint8_t*)NULL)
+    return 0;
+    
+  digitalWrite(nrfCSN, LOW);
+  for (int i = 0; i < cnt; i++) {
+    buf[i] = SPI.transfer(buf[i]);
+  }
+  digitalWrite(nrfCSN, HIGH);
+  gNrfStatus = buf[0];
+  return buf[0];
+}
+
+void IRAM_ATTR nrfIntrHandler(void)
+{
+  long sndVal = 1;
+  xQueueSendToBack( nrf_queue, &sndVal, portMAX_DELAY );
+}
+
+void nrf24_init(void)
+{
+  SPI.begin(SCLK_PIN, MISO_PIN, MOSI_PIN, NRFIRQ); // sck, miso, mosi, ss (ss can be any GPIO)
+  pinMode(nrfCSN, OUTPUT);
+  digitalWrite(nrfCSN, HIGH);
+  pinMode(nrfCE, OUTPUT);
+  digitalWrite(nrfCE, LOW);
+
+  // Turn OFF receiving mode, in case it is on...
+//  digitalWrite(nrfCE, LOW);
+
+  // NRF setup
+  // enable 8-bit CRC; mask TX_DS and MAX_RT
+  nrfRegWrite( NRF_CONFIG, 0x3c );
+
+  if (en_shockburst) {
+    // set nbr of retries and delay
+    //  nrfRegWrite( NRF_SETUP_RETR, 0x5F );
+    nrfRegWrite( NRF_SETUP_RETR, 0x33 );
+    nrfRegWrite( NRF_EN_AA, 1 ); // enable auto ack
+  } else {
+    nrfRegWrite( NRF_SETUP_RETR, 0 );
+    nrfRegWrite( NRF_EN_AA, 0 );
+  }
+
+  // Disable dynamic payload
+  nrfRegWrite( NRF_FEATURE, 0);
+  nrfRegWrite( NRF_DYNPD, 0);
+
+  // Reset STATUS
+  nrfRegWrite( NRF_STATUS, 0x70 );
+
+  nrfRegWrite( NRF_EN_RXADDR, 1 ); //3);
+  nrfRegWrite( NRF_RX_PW_P0, PAYLOAD_LEN );
+
+  nrfRegWrite( NRF_RX_PW_P1, 0 ); //PAYLOAD_LEN );
+  nrfRegWrite( NRF_RX_PW_P2, 0 );
+  nrfRegWrite( NRF_RX_PW_P3, 0 );
+  nrfRegWrite( NRF_RX_PW_P4, 0 );
+  nrfRegWrite( NRF_RX_PW_P5, 0 );
+
+  // Set up channel
+  nrfRegWrite( NRF_RF_CH, rf_chan );
+
+  int speedVal = 0x0e;
+  switch (speed) {
+  case speed_1M:
+    speedVal = 0x06;
+    break;
+  case speed_250K:
+    speedVal = 0x26;
+    break;
+  }
+  nrfRegWrite( NRF_RF_SETUP, speedVal | 0);
+
+  nrfFlushTx();
+  nrfFlushRx();
+
+  pinMode(NRFIRQ, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(NRFIRQ), nrfIntrHandler, FALLING);
+  
+  // Power up radio and delay 5ms
+  nrfRegWrite( NRF_CONFIG, nrfRegRead( NRF_CONFIG ) | 0x02 );
+  delay(5);
+
+  // Enable PRIME RX (PRX)
+  nrfRegWrite( NRF_CONFIG, nrfRegRead( NRF_CONFIG ) | 0x01 );
+
+//  if (verbose)
+//    nrfPrintDetails();
+
+  // Start receiving lofi packets...
+  digitalWrite(nrfCE, HIGH);
+  
+}
 int nrfAddrRead( uint8_t reg, uint8_t *buf, int len )
 {
   if (buf && len > 1) {
